@@ -1,8 +1,6 @@
 import os
-import json
 import streamlit as st
 import datetime
-import math
 from dotenv import load_dotenv
 from meldrx_fhir_client import FHIRClient
 
@@ -13,17 +11,10 @@ MELDRX_WORKSPACE_ID = MELDRX_WORKSPACE_URL.split("/")[-1]
 MELDRX_CLIENT_ID = os.environ.get("MELDRX_CLIENT_ID")
 MELDRX_CLIENT_SECRET = os.environ.get("MELDRX_CLIENT_SECRET")
 
-# Initial patient...
-PATIENT_ID_DEFAULT = "INSERT PATIENT ID HERE"
-
 # Configuration...
 MELDRX_BASE_URL = "https://app.meldrx.com"
-MELDRX_CLIENT_ID = MELDRX_CLIENT_ID
 SCOPE = "system/*.read"
 
-def get_fhir_client():
-    print("Workspace ID: " + MELDRX_WORKSPACE_ID)
-    return FHIRClient.for_client_secret(MELDRX_BASE_URL, MELDRX_WORKSPACE_ID, MELDRX_CLIENT_ID, MELDRX_CLIENT_SECRET, SCOPE)
 
 # Define the Cockcroft-Gault Equation
 def cockcroft_gault(weight, serum_creatinine, age, gender):
@@ -36,111 +27,64 @@ def cockcroft_gault(weight, serum_creatinine, age, gender):
     creatinine_clearance = ((140 - age) * weight * constant) / (72 * serum_creatinine)
     return creatinine_clearance
 
+
 # Search for patients by name/dob...
 def search_patients(first_name, last_name, dob):
-    fhirClient = get_fhir_client()
+    fhir = FHIRClient.for_client_secret(MELDRX_BASE_URL, MELDRX_WORKSPACE_ID, MELDRX_CLIENT_ID, MELDRX_CLIENT_SECRET, SCOPE)
 
-    # Format inputs...
-    # TODO: Until date_input allows a blank value, I am just using text for the DOB
-    #sDob = ""
-    #if (dob != None):
-    #    sDob = dob.strftime("%Y-%m-%d")
-    sDob = dob
-
-    search_params = { }
-    if (first_name != ""):
+    search_params = {}
+    if first_name != "":
         search_params["given"] = first_name
-    if (last_name != ""):
+    if last_name != "":
         search_params["family"] = last_name
-    if (sDob != ""):
-        search_params["birthdate"] = sDob
+    if dob != "":
+        search_params["birthdate"] = dob
 
     # Search patients...
-    searchResults = fhirClient.search_resource("Patient", search_params)
-    return searchResults
+    return fhir.search_resource("Patient", search_params)
+
 
 def render():
-    # Start off with a random patient for demonstration purposes...
-    if ('isInitialized' not in st.session_state):
-        fhirClient = get_fhir_client()
-        patient = fhirClient.read_resource("Patient", PATIENT_ID_DEFAULT)
-
-        patientId = patient["id"]
-        patientName = patient["name"][0]["given"][0] + " " + patient["name"][0]["family"]
-        patientGender = patient["gender"]
-        patientDOB = patient["birthDate"]
-        patientAge = datetime.datetime.now().year - int(patientDOB[0:4])
-
-        # Add all to session state...
-        st.session_state['patient'] = patient
-        st.session_state['patientId'] = patientId
-        st.session_state['patientName'] = patientName
-        st.session_state['patientGender'] = patientGender
-        st.session_state['patientDOB'] = patientDOB
-        st.session_state['patientAge'] = patientAge
-        st.session_state['isInitialized'] = True
-
-    # If patient is in the session, load it into the variables...
-    if ('patient' in st.session_state):
-        patient = st.session_state['patient']
-        patientId = st.session_state['patientId']
-        patientName = st.session_state['patientName']
-        patientGender = st.session_state['patientGender']
-        patientDOB = st.session_state['patientDOB']
-        patientAge = st.session_state['patientAge']
-
     # App Header...
     st.title("Creatinine Clearance Calculator")
     st.markdown("___")
 
     # Search for Patient (first name, last name, birthdate)...
     st.markdown("## Search for Patient")
-    searchFirstName = st.text_input("First Name")
-    searchLastName = st.text_input("Last Name")
-    searchDOB = st.text_input("Date of Birth (YYYY-MM-DD)")
-    #searchDOB = st.date_input("Date of Birth", None, min_value=datetime.datetime(1900, 1, 1), max_value=datetime.datetime.now())
+    search_first_name = st.text_input("First Name")
+    search_last_name = st.text_input("Last Name")
+    search_dob = st.text_input("Date of Birth (YYYY-MM-DD)")
+
     if st.button("Search"):
-        searchResults = search_patients(searchFirstName, searchLastName, searchDOB)
+        search_results = search_patients(search_first_name, search_last_name, search_dob)
 
         # If no entries, display message and return...
-        if (not "entry" in searchResults):
+        if "entry" not in search_results or len(search_results["entry"]) == 0 or search_results["entry"][0]['resource']['resourceType'] != 'Patient':
             st.markdown("No patients found.")
             return
 
-        # Look at bundle and just take the first result...
-        entry = searchResults["entry"][0]
-        if (entry == None):
-            st.markdown("No patients found.")
-            return
+        st.session_state['patient'] = search_results["entry"][0]["resource"]
 
-        # Grab data about the patient...
-        patient = entry["resource"]
-        patientId = patient["id"]
-        patientName = patient["name"][0]["given"][0] + " " + patient["name"][0]["family"]
-        patientGender = patient["gender"]
-        patientDOB = patient["birthDate"]
-        patientAge = datetime.datetime.now().year - int(patientDOB[0:4])
+    if 'patient' not in st.session_state:
+        return
 
-        # Save to session state...
-        st.session_state['patient'] = patient
-        st.session_state['patientId'] = patientId
-        st.session_state['patientName'] = patientName
-        st.session_state['patientGender'] = patientGender
-        st.session_state['patientDOB'] = patientDOB
-        st.session_state['patientAge'] = patientAge
+    patient = st.session_state['patient']
+
+    name = patient["name"][0]["given"][0] + " " + patient["name"][0]["family"]
+    gender = patient["gender"]
+    dob = patient["birthDate"]
+    age = datetime.datetime.now().year - int(dob[0:4])
+
+    st.markdown("___")
+    st.markdown("## Patient Data")
+    st.markdown("Name: " + name)
+    st.markdown("Gender: " + gender)
+    st.markdown("Age: " + str(age))
     st.markdown("___")
 
-    # Patient Information...
-    if (patient != None):
-        st.markdown("## Patient Data")
-        st.markdown("Name: " + patientName)
-        st.markdown("Gender: " + patientGender)
-        st.markdown("Age: " + str(patientAge))
-        st.markdown("___")
-
     # Input fields, initialized with patient data (if possible)...
-    gender = st.selectbox("Gender", ("Male", "Female"), 1 if patientGender == "female" else 0)
-    age = st.number_input("Age (years)", min_value=0, max_value=150, value=patientAge, step=1)
+    gender = st.selectbox("Gender", ("Male", "Female"), 1 if gender == "female" else 0)
+    age = st.number_input("Age (years)", min_value=0, max_value=150, value=age, step=1)
     weight = st.number_input("Weight (kg)", min_value=1.0, max_value=300.0, value=70.0, step=0.1)
     serum_creatinine = st.number_input("Serum Creatinine (umol/L)", min_value=0.1, max_value=1500.0, value=60.0, step=0.1)
 
@@ -148,5 +92,6 @@ def render():
     if st.button("Calculate"):
         result = cockcroft_gault(weight, serum_creatinine, age, gender)
         st.write(f"Creatinine Clearance: {result:.2f} ml/min")
+
 
 render()
