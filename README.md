@@ -1,5 +1,5 @@
-# health-universe-diabetes-risk-score
-Diabetes Risk Score for Health Universe
+# MeldRx Template System App in Python +Streamlit
+Diabetes Risk Score
 
 ## Getting Started
 Before launching the app ensure the following configuration steps have been followed:
