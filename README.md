@@ -1,5 +1,5 @@
 # MeldRx Template System App in Python +Streamlit
-Diabetes Risk Score
+Creatine Clearnace Calculator
 
 ## Getting Started
 Before launching the app ensure the following configuration steps have been followed:
