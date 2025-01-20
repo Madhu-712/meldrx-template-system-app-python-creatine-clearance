@@ -1,6 +1,8 @@
 # MeldRx Template System App in Python +Streamlit
 Creatine Clearnace Calculator
 
+streamlit app endpoint link : https://rct77twjjl9ktukgcc643u.streamlit.app/
+
 ## Getting Started
 Before launching the app ensure the following configuration steps have been followed:
 
