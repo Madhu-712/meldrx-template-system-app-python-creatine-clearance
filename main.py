@@ -13,7 +13,7 @@ MELDRX_CLIENT_SECRET = os.environ.get("MELDRX_CLIENT_SECRET")
 
 # Configuration...
 MELDRX_BASE_URL = "https://app.meldrx.com"
-SCOPE = "system/*.read"
+SCOPE = "patient/*.read"
 
 
 # Define the Cockcroft-Gault Equation
